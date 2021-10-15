@@ -6,4 +6,4 @@
 
 ### Faire CTRL + A et click sur R studio pour que ça marche
 
-# 
+# Ca ouvrira également une fenetre pour choisir ton fichier de données 
