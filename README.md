@@ -4,6 +4,6 @@
 
 ### Pour faire tourner get_gene_ids_go_terms.R: lancer install_dependencies.R avant pour installer les packages dont t'as besoin
 
-### Faire CTRL + A et click sur R pour que ça marche
+### Faire CTRL + A et click sur R studio pour que ça marche
 
 # 
