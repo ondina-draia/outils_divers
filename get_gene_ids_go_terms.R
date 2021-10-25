@@ -6,6 +6,8 @@
 
 library(biomaRt)
 library(dplyr)
+library(tidyverse)
+ensembl <- useMart(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
 
 ### tu run this script, CTRL + A and click on RUN
 
@@ -28,9 +30,20 @@ data_new <- inner_join(data, gene_IDs, by = c("gene_id"="ensembl_gene_id"))
 
 #filtering
 data_new_filt <- data_new[-c(10)]
-### several go terms per gene, assemble theme in one single row
+
+#erase duplicated 
+# duplicated values in gene_ids
+gene_ids <- gene_IDs[!duplicated(gene_IDs$mgi_symbol), ]
+
+for(row in 1:nrow(data_new_filt)){
+  if(rownames(data_new_filt)[row] %in% gene_ids$ensembl_gene_id) {
+    if((gene_ids[which(gene_ids$ensembl_gene_id == rownames(data_new_filt)[row]),])$mgi_symbol != "") {
+      rownames(data_new_filt)[row] <- (gene_ids[which(gene_ids$ensembl_gene_id == rownames(data_new_filt)[row]),])$mgi_symbol
+    }
+  } 
+}
 
 
 #export table in csv format
-write.table(data_new_filt, file = "genes_rnaseq_data_names.csv", sep = "\t",
+write.table(data_new_filt, file = "genes_rnaseq_data_names_filt.csv", sep = "\t",
             row.names = TRUE, col.names = NA)
