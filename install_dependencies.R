@@ -15,3 +15,4 @@ BiocManager::install("biomaRt")
 
 ### Install dplyr
 install.packages("dplyr")
+install.packages("tidyverse")

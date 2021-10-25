@@ -28,6 +28,7 @@ data_new <- inner_join(data, gene_IDs, by = c("gene_id"="ensembl_gene_id"))
 
 #filtering
 data_new_filt <- data_new[-c(10)]
+### several go terms per gene, assemble theme in one single row
 
 
 #export table in csv format
