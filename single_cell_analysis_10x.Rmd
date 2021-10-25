@@ -1,0 +1,241 @@
+---
+title: "Single Cell data analysis, data from CRCT"
+output: html_notebook
+---
+
+```{r Calling libraries}
+library(Seurat)
+# run install.packages("devtools") and then install Seurat Data with devtools::install_github('satijalab/seurat-data')
+library(SeuratData)
+library(ggplot2)
+```
+
+
+```{r Data import 1 }
+
+#Import BAPN_CTL_filtered
+# if you have a zip file
+zipfile <- file.choose()
+unzip(zipfile = zipfile , exdir = "./BAPN_CTL_filtered")
+# import barcode, matrix and gene file
+data_dir <- './BAPN_CTL_filtered'
+list.files(data_dir) # Should show barcodes.tsv, genes.tsv, and matrix.mtx
+expression_matrix_BAPN_CTL <- Read10X(data.dir = data_dir)
+sc_data_BAPN_CTRL = CreateSeuratObject(counts = expression_matrix_BAPN_CTL, project = "BAPN_CTL_filtered", min.cells = 3, min.features = 200)
+
+#import BAPN_LD_filtered
+zipfile <- file.choose()
+unzip(zipfile = zipfile , exdir = "./BAPN_LD_filtered")
+data_dir <- './BAPN_LD_filtered'
+list.files(data_dir) # Should show barcodes.tsv, genes.tsv, and matrix.mtx
+expression_matrix_BAPN_LD <- Read10X(data.dir = data_dir)
+sc_data_BAPN_LD = CreateSeuratObject(counts = expression_matrix_BAPN_LD, project = "BAPN_LD_filtered", min.cells = 3, min.features = 200)
+
+#import PBS_CTL_filtered
+zipfile <- file.choose()
+unzip(zipfile = zipfile , exdir = "./PBS_CTL_filtered")
+data_dir <- './PBS_CTL_filtered'
+list.files(data_dir) # Should show barcodes.tsv, genes.tsv, and matrix.mtx
+expression_matrix_PBS_CTL <- Read10X(data.dir = data_dir)
+sc_data_PBS_CTL = CreateSeuratObject(counts = expression_matrix_PBS_CTL, project = "PBS_CTL_filtered", min.cells = 3, min.features = 200)
+
+#import PBS_LD_filtered
+zipfile <- file.choose()
+unzip(zipfile = zipfile , exdir = "./PBS_LD_filtered")
+data_dir <- './PBS_LD_filtered'
+list.files(data_dir) # Should show barcodes.tsv, genes.tsv, and matrix.mtx
+expression_matrix_PBS_LD <- Read10X(data.dir = data_dir)
+sc_data_PBS_LD = CreateSeuratObject(counts = expression_matrix_PBS_LD, project = "PBS_LD_filtered", min.cells = 3, min.features = 200)
+
+```
+
+#### ignore it if Data import 1 worked on your file
+```{r Data import 2}
+#if you already have extracted the matrix, barcode and genes file
+data_dir <- file.choose()
+list.files(data_dir) # Should show barcodes.tsv, genes.tsv, and matrix.mtx
+expression_matrix <- Read10X(data.dir = data_dir)
+sc_data = CreateSeuratObject(counts = expression_matrix)
+```
+
+########################################################################################################################################
+
+# Combine all four seurat objects
+
+```{r}
+sc_data <- merge(sc_data_BAPN_CTRL, y = c(sc_data_BAPN_LD, sc_data_PBS_CTL,sc_data_PBS_LD), add.cell.ids = c("sc_data_BAPN_CTRL","sc_data_BAPN_LD","sc_data_PBS_CTL","sc_data_PBS_LD"), project = "sc_data_all",  min.cells = 3, min.features = 200)
+sc_data 
+```
+
+
+########################################################################################################################################
+
+```{r Quality control}
+#look if there are too much mitochondrial counts
+sc_data[["percent.mt"]] <- PercentageFeatureSet(sc_data, pattern = "^MT-")
+VlnPlot(sc_data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+# the vin plot shows that the filtering was already done, no MT counts in the data
+```
+
+```{r}
+# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
+# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
+
+plot1 <- FeatureScatter(sc_data, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(sc_data, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot1 + plot2
+```
+
+```{r Normalizing }
+sc_data_filt <- SCTransform(sc_data)
+
+sc_data_filt <- NormalizeData(object = sc_data_filt, normalization.method = "LogNormalize", 
+    scale.factor = 10000)
+```
+
+########################################################################################################################################################################
+
+### Finding top variable features 
+
+```{r Identification of highly variable features (feature selection)}
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(sc_data_filt), 10)
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(sc_data_filt )
+plot1 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1
+```
+
+########################################################################################################################################################################
+
+### Scaling the data, perform linear reduction, using the Jack straw method (like in the article), finding clusters and neighbours and T-SNE with the same number of clusters as in the article (didn't have the information about how many dimensions they used or the resolution so I tried several times untill finding the right number)
+
+```{r Scaling the data, echo=FALSE, warning=FALSE,message=FALSE}
+all.genes <- rownames(sc_data_filt)
+sc_data_filt <- ScaleData(sc_data_filt, features = all.genes)
+```
+
+```{r Perform linear dimensional reduction, echo=FALSE, warning=FALSE, message=FALSE}
+sc_data_filt <- RunPCA(sc_data_filt, features = VariableFeatures(object = sc_data_filt))
+```
+
+```{r}
+DimPlot(sc_data_filt, reduction = "pca")
+```
+
+```{r}
+# fonctionne que sur les donnees normalisees sans SC transform, optionnel
+#sc_data_filt <- JackStraw(sc_data_filt, num.replicate = 100)
+#sc_data_filt <- ScoreJackStraw(sc_data_filt, dims = 1:20)
+#JackStrawPlot(sc_data_filt, dims = 1:15)
+```
+
+
+```{r}
+sc_data_filt <- FindNeighbors(sc_data_filt, dims = 1:10)
+sc_data_filt <- FindClusters(sc_data_filt, resolution = 0.8)
+```
+
+```{r Run non-linear dimensional reduction (UMAP/tSNE)}
+sc_data_filt <- RunUMAP(sc_data_filt, dims = 1:10)
+# note that you can set `label = TRUE` or use the LabelClusters function to help label
+# individual clusters
+DimPlot(sc_data_filt, reduction = "umap")
+DimPlot(sc_data_filt, reduction = "pca")
+```
+
+```{r}
+library(clustree)
+# Select a range of resolutions
+resolution.range <- seq(from = 0, to = 1, by = 0.05)
+
+# Find clusters using a range of resolutions
+df <- Seurat::FindClusters(object = sc_data_filt, resolution = resolution.range)
+clustree(df)
+```
+
+
+```{r}
+FeaturePlot(sc_data_filt, features = features, label = T)
+```
+
+```{r}
+FeaturePlot(sc_data_filt, features = "Il6", split.by = "orig.ident")
+```
+
+
+```{r}
+features <- c("Il6","Lox","Eln","Fn1","Col1a1","Col1a2","Postn")
+
+StackedVlnPlot(obj = sc_data_filt, features = features)
+```
+
+###################################################################################################################################################
+
+### importing original Rds file
+
+```{r}
+rds <- file.choose()
+allcells <- readRDS(rds, refhook = NULL)
+```
+
+```{r}
+DimPlot(allcells, reduction = "umap")
+```
+
+
+
+### Stacked Violin plot code 
+
+```{r}
+# code from  https://divingintogeneticsandgenomics.rbind.io/post/stacked-violin-plot-for-visualizing-single-cell-data-in-seurat/
+# need patchwork and ggplot2 and seurat of course to work
+# modified a bit 
+## remove the x-axis text and tick
+## plot.margin to adjust the white space between each plot.
+## ... pass any arguments to VlnPlot in Seurat
+modify_vlnplot<- function(obj, 
+                          feature, 
+                          pt.size = 0, 
+                          plot.margin = unit(c(-0.75, 0, -0.75, 0), "cm"),
+                          ...) {
+  p <- VlnPlot(obj, features = feature, pt.size = pt.size, ... )  + 
+    xlab("") + ylab(feature) + ggtitle("") + 
+    theme(legend.position = "none", 
+          plot.title= element_blank(),
+          axis.title.x = element_blank(),
+          axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.title.y = element_text(size = rel(1), angle = 0), 
+          axis.text.y = element_text(size = rel(1)), 
+          plot.margin = plot.margin ) 
+  return(p)
+}
+## extract the max value of the y axis
+extract_max<- function(p){
+  ymax<- max(ggplot_build(p)$layout$panel_scales_y[[1]]$range$range)
+  return(ceiling(ymax))
+}
+## main function
+StackedVlnPlot<- function(obj, features,
+                          pt.size = 0, 
+                          plot.margin = unit(c(-0.75, 0, -0.75, 0), "cm"),
+                          ...) {
+  
+  plot_list<- purrr::map(features, function(x) modify_vlnplot(obj = obj,feature = x, ...))
+  
+  # Add back x-axis title to bottom plot. patchwork is going to support this?
+  plot_list[[length(plot_list)]]<- plot_list[[length(plot_list)]] +
+    theme(axis.text.x=element_text(), axis.ticks.x = element_line())
+  
+  # change the y-axis tick to only max value 
+  ymaxs<- purrr::map_dbl(plot_list, extract_max)
+  plot_list<- purrr::map2(plot_list, ymaxs, function(x,y) x + 
+                            scale_y_continuous(breaks = c(y)) + 
+                            expand_limits(y = y))
+  p<- patchwork::wrap_plots(plotlist = plot_list, ncol = 1)
+  return(p)
+}
+```
+
