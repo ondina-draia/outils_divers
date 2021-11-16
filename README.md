@@ -10,4 +10,4 @@
 
 ------------------------------------------------------------------------------------------------------------------------------
 
-###ˇ### Ajout d'un code permettant d'utiliser volcano3D avec un objet Seurat, des modifications a venir pour faciliter l'utilisation
+###### Ajout d'un code permettant d'utiliser volcano3D avec un objet Seurat, des modifications a venir pour faciliter l'utilisation ( en suivant l'aide précieuse qu'on m'a donné ici [volcano3d github repo issues](https://github.com/KatrionaGoldmann/volcano3D/issues/15)
