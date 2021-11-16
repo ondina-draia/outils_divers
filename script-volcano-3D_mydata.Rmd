@@ -1,0 +1,107 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(Seurat)
+library(volcano3D)
+library(SeuratData)
+library(qvalue)
+```
+
+
+```{r}
+# Load in example data
+filename <- file.choose()
+allcells <- readRDS(filename)
+```
+
+
+```{r}
+# sample data
+sample_data <- allcells@meta.data
+sample_data$ID <- rownames(sample_data)
+sample_data$orig.ident <- gsub(" ", "", sample_data$orig.ident)
+Idents(object = allcells) <- "orig.ident"
+groups <- levels(allcells)[1:3]
+sample_data = sample_data[sample_data$orig.ident %in% gsub(" ", "", groups), ]
+
+
+# expression data (scaled)
+exp <- as.matrix(allcells@assays$RNA@scale.data)
+exp <- exp[, sample_data$ID]
+
+# This example set has multiple groups. Lets look at the last 3 as an example: 
+
+contrasts <- c(paste(groups[1], groups[2], sep="-"), 
+               paste(groups[2], groups[3], sep="-"), 
+               paste(groups[3], groups[1], sep="-"))
+```
+
+```{r}
+# calculate the DEG between each of these groups using FindMarkers
+Pvals <- lapply(contrasts, function(x){
+  vars <- unlist(strsplit(x, split="-"))
+  out <- FindMarkers(allcells, ident.1 = vars[1], ident.2 = vars[2], min.pct = 0, 
+                     logfc.threshold = 0)
+  out <- out[rownames(exp), c("p_val", "p_val_adj", "avg_log2FC")]
+})
+Pvals_df <- do.call( "cbind", Pvals)
+colnames(Pvals_df) <- paste0(rep(gsub("-", "_", gsub(" ", "", contrasts)), each=3), "_",
+                             rep(c("pvalue", "padj", "logFC"), 3))
+```
+
+```{r}
+P_vals_nona <- na.omit(Pvals_df)
+keep <- rownames(P_vals_nona)
+exp_nona <- exp[keep, ]
+
+# calculate the polar coordinates
+polar = polar_coords(sample_data, contrast="seurat_annotations" ,
+                     P_vals_nona, exp_nona, p_col_suffix = "pvalue", 
+                     significance_cutoff = 1e-5)
+
+# radial output
+radial_plotly(polar)
+
+
+# visualise specific genes (note this plots the expression in the same format as exp, here scale.data)
+boxplot_trio(polar, "CCL5")
+```
+
+```{r}
+# apply AOV to every gene to find significance
+aov.stats <- apply(exp, 1, function(x){
+  df <- data.frame('Gene' = as.numeric(x),
+                   'Annotation' = sample_data$seurat_annotations)
+  fit <- lm(Gene ~ Annotation, data = df)
+  stat.aov <- try(car::Anova(fit))
+  if(class(stat.aov)[1] == "try-error") {
+    return(1)
+  } else{
+    stat.aov <- stat.aov[1, "Pr(>F)"]
+    return(stat.aov)
+  }
+})
+aov.stats2 <- data.frame("overall_pvalue" = aov.stats, 
+                        "overall_padj" = qvalue::qvalue(aov.stats)$qvalue)
+rownames(aov.stats2) = rownames(exp)
+```
+
+```{r}
+# combine with pairwise statistics
+P_df <- cbind(P_vals_nona, aov.stats2[rownames(P_vals_nona), ])
+
+# Calculate the polar coordinates
+polar <- polar_coords(sample_data, contrast="seurat_annotations" ,
+                     P_df, exp_nona, p_col_suffix = "pvalue", 
+                     multi_group_prefix = "overall")
+
+# 3D volcano plot
+volcano3D(polar)
+
+# To explore a particularly significant gene
+boxplot_trio(polar, "PPBP")
+```
+
