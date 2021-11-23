@@ -1,5 +1,5 @@
 ## Outils divers
-Utiliser: script-ensemblid-to-go.R
+Obtenir GO Ids for a set of genes inside of an excel table:
 
 #### Ajout des gene names et GO ids à la fin d'un tableau en fonction des ensembl ids de la première colonne du tableau:
 
