@@ -16,3 +16,9 @@ BiocManager::install("biomaRt")
 ### Install dplyr
 install.packages("dplyr")
 install.packages("tidyverse")
+
+# Install DT 
+install.packages("DT")
+
+#Install Excel
+install.packages("readxl")
