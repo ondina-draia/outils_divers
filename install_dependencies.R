@@ -2,7 +2,7 @@
 
 ### tu run this script, CTRL + A and click on RUN
 
-## ???Install Biocmanager
+## Install Biocmanager
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install(version = "3.13")
